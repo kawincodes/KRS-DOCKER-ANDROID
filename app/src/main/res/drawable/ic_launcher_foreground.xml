@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stacked container boxes (whale-less docker mark) -->
+    <group android:scaleX="0.55" android:scaleY="0.55" android:translateX="24" android:translateY="26">
+        <path android:fillColor="#FAFAFA" android:pathData="M8,40h16v14H8z"/>
+        <path android:fillColor="#FAFAFA" android:pathData="M28,40h16v14H28z"/>
+        <path android:fillColor="#FAFAFA" android:pathData="M48,40h16v14H48z"/>
+        <path android:fillColor="#FAFAFA" android:pathData="M28,22h16v14H28z"/>
+        <path android:fillColor="#FAFAFA" android:pathData="M48,22h16v14H48z"/>
+        <path android:fillColor="#FAFAFA" android:pathData="M48,4h16v14H48z"/>
+        <path android:fillColor="#3B82F6" android:pathData="M0,60h100a4,4 0 0 1 4,4v4a4,4 0 0 1 -4,4H0a4,4 0 0 1 -4,-4v-4a4,4 0 0 1 4,-4z"/>
+    </group>
+</vector>

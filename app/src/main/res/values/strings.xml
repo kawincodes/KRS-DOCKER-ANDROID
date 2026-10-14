@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">KRS Dockers</string>
+    <string name="engine_notification_channel">Docker Engine</string>
+    <string name="engine_running">Docker engine is running</string>
+</resources>
