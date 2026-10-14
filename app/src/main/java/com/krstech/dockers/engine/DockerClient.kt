@@ -60,7 +60,7 @@ class DockerClient(
         when (host) {
             is DockerHost.Unix -> {
                 socketFactory(UnixSocketFactory(host.path))
-                dns { listOf(InetAddress.getByName("127.0.0.1")) }
+                dns(object : okhttp3.Dns { override fun lookup(hostname: String): List<InetAddress> = listOf(InetAddress.getByName("127.0.0.1")) })
             }
             is DockerHost.Tcp -> host.tlsSocketFactory()?.let { (sf, tm) ->
                 sslSocketFactory(sf, tm)
