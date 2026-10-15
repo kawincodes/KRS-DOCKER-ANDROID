@@ -4,6 +4,10 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (creates tag v<version>), e.g. 1.0.0"
+        required: true
 
 permissions:
   contents: write
@@ -15,13 +19,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" > /dev/null
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -51,8 +58,9 @@ jobs:
       - name: Sign release APK
         run: |
           BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-          VERSION="${GITHUB_REF_NAME#v}"
-          [ "$GITHUB_REF_TYPE" = "tag" ] || VERSION="$(git rev-parse --short HEAD)"
+          VERSION="${{ github.event.inputs.version }}"
+          [ -n "$VERSION" ] || VERSION="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_TYPE" = "tag" ] || [ -n "${{ github.event.inputs.version }}" ] || VERSION="$(git rev-parse --short HEAD)"
           mkdir -p dist
           "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk dist/aligned.apk
           "$BT/apksigner" sign --ks keystore.jks --ks-pass "pass:$KS_PASS" --ks-key-alias "$KS_ALIAS" --key-pass "pass:$KEY_PASS" \
@@ -70,10 +78,12 @@ jobs:
           path: dist/*
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: KRS Dockers ${{ github.ref_name }}
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: KRS Dockers v${{ env.VERSION }}
           body_path: RELEASE_NOTES.md
           files: |
             dist/*.apk
