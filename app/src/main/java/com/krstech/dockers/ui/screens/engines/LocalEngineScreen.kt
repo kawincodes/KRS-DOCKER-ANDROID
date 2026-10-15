@@ -58,7 +58,7 @@ class LocalEngineViewModel(private val app: AppContainer) : ViewModel() {
 
     init { refresh() }
 
-    fun refresh() { viewModelScope.launch { app.localEngine.refresh(); _log.value = app.localEngine.readLog() } }
+    fun refresh() { viewModelScope.launch { app.localEngine.refresh(app.settings.settings.first().localPort); _log.value = app.localEngine.readLog() } }
     fun runChecks() { viewModelScope.launch { runCatching { app.localEngine.runChecks() }.onFailure { _error.value = it.message } } }
     fun loadVersions() { viewModelScope.launch { runCatching { app.localEngine.availableVersions() }.onSuccess { _versions.value = it }.onFailure { _error.value = "Could not list versions: ${it.message}" } } }
     fun install(version: String) { viewModelScope.launch { _error.value = null; runCatching { app.localEngine.install(version) }.onFailure { _error.value = it.message }; refresh() } }
@@ -67,9 +67,11 @@ class LocalEngineViewModel(private val app: AppContainer) : ViewModel() {
         viewModelScope.launch {
             _error.value = null
             val s = app.settings.settings.first()
-            runCatching { app.localEngine.start(LocalEngine.Options(s.localPort, s.localStorageDriver, s.localIptables, s.localExtraArgs)) }
+            // overlay2 can't work without overlayfs in the kernel; fall back to vfs instead of failing.
+            val driver = if (app.localEngine.status.value.overlaySupported == false && s.localStorageDriver == "overlay2") "vfs" else s.localStorageDriver
+            runCatching { app.localEngine.start(LocalEngine.Options(s.localPort, driver, s.localIptables, s.localExtraArgs)) }
                 .onSuccess {
-                    if (app.localEngine.status.value.running) {
+                    if (app.localEngine.status.value.apiOk == true) {
                         val profile = app.profiles.current().firstOrNull { it.id == ProfileRepository.LOCAL_PROFILE_ID }?.copy(url = "tcp://127.0.0.1:${s.localPort}")
                         if (profile != null) { app.profiles.upsert(profile); app.engine.connect(profile) }
                     }
@@ -100,18 +102,44 @@ fun LocalEngineScreen(nav: NavHostController) {
     LaunchedEffect(Unit) { vm.runChecks() }
 
     Column(Modifier.fillMaxSize()) {
-        ShadTopBar("Local engine", subtitle = "dockerd on this device (root)", onBack = { nav.popBackStack() }) {
+        ShadTopBar("Root engine", subtitle = "Native dockerd on this phone (root)", onBack = { nav.popBackStack() }) {
             ShadIconButton(Lucide.RefreshCw, "Refresh", onClick = { vm.refresh(); vm.runChecks() })
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            InfoBanner("Running Docker natively on Android needs a rooted device (Magisk/KernelSU) and a kernel built with namespaces, cgroups, overlayfs and netfilter. Most stock kernels lack some of these; custom kernels (e.g. with docker patches) work best. If this device isn't rooted, use a Remote or WSL2 engine instead.")
-            ErrorBanner(error)
+            if (status.containersSupported == false) {
+                ShadCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Lucide.CircleX, null, tint = c.destructive, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("This phone's kernel can't run containers natively", style = MaterialTheme.typography.titleMedium, color = c.foreground, modifier = Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "It was built without ${status.missingCritical.joinToString(", ")}. dockerd may start, but every docker run will fail. An app can't add these to the kernel. " +
+                            "The Docker VM boots its own Linux kernel with everything Docker needs, so it works on this phone.",
+                        style = MaterialTheme.typography.bodySmall, color = c.mutedForeground,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ShadButton(onClick = { nav.navigate(com.krstech.dockers.ui.navigation.Routes.VM_ENGINE) }, leadingIcon = Lucide.Container, modifier = Modifier.fillMaxWidth()) { ButtonText("Use Docker VM (no root) instead") }
+                }
+            } else {
+                InfoBanner("Native dockerd needs root (Magisk/KernelSU) and a kernel with namespaces, cgroups, overlayfs and netfilter. Many stock kernels lack some of these. If containers don't start, use the Docker VM (no root) instead.")
+            }
+            ErrorBanner(error ?: status.lastError)
             ShadCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (status.running) Lucide.CircleCheck else Lucide.CircleStop, null, tint = if (status.running) c.success else c.mutedForeground, modifier = Modifier.size(20.dp))
+                    Icon(if (status.running && status.apiOk != false) Lucide.CircleCheck else if (status.running) Lucide.TriangleAlert else Lucide.CircleStop, null,
+                        tint = if (status.running && status.apiOk != false) c.success else if (status.running) c.warning else c.mutedForeground, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(if (status.running) "Engine running" else "Engine stopped", style = MaterialTheme.typography.titleMedium, color = c.foreground)
+                        Text(
+                            when {
+                                status.running && status.apiOk == false -> "dockerd running, API not responding"
+                                status.running -> "Engine running"
+                                else -> "Engine stopped"
+                            },
+                            style = MaterialTheme.typography.titleMedium, color = c.foreground,
+                        )
                         Text(listOfNotNull(status.installedVersion?.let { "docker $it" }, status.pid?.let { "pid $it" }, "tcp://127.0.0.1:${settings.localPort}").joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = c.mutedForeground)
                     }
                 }
@@ -119,7 +147,8 @@ fun LocalEngineScreen(nav: NavHostController) {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (status.running) ShadButton(onClick = { vm.stop() }, variant = ButtonVariant.Destructive, loading = status.busy, leadingIcon = Lucide.Square, modifier = Modifier.weight(1f)) { ButtonText("Stop") }
-                    else ShadButton(onClick = { vm.start() }, enabled = status.binariesInstalled && status.rootAvailable == true, loading = status.busy, leadingIcon = Lucide.Play, modifier = Modifier.weight(1f)) { ButtonText("Start engine") }
+                    else ShadButton(onClick = { vm.start() }, enabled = status.binariesInstalled && status.rootAvailable == true, loading = status.busy, leadingIcon = Lucide.Play, modifier = Modifier.weight(1f),
+                        variant = if (status.containersSupported == false) ButtonVariant.Outline else ButtonVariant.Default) { ButtonText(if (status.containersSupported == false) "Start anyway" else "Start engine") }
                     ShadButton(onClick = { showLog = !showLog }, variant = ButtonVariant.Outline, leadingIcon = Lucide.ScrollText, modifier = Modifier.weight(1f)) { ButtonText("Daemon log") }
                 }
                 if (showLog) { Spacer(Modifier.height(10.dp)); LogView(log, Modifier.height(260.dp)); Spacer(Modifier.height(6.dp)); Row { ShadButton(onClick = { vm.refresh() }, variant = ButtonVariant.Ghost, size = ButtonSize.Sm) { ButtonText("Reload") }; ShadButton(onClick = { vm.clearLog() }, variant = ButtonVariant.Ghost, size = ButtonSize.Sm) { ButtonText("Clear") } } }
@@ -154,6 +183,10 @@ fun LocalEngineScreen(nav: NavHostController) {
                 ShadInput(port, { port = it; it.toIntOrNull()?.let { p -> vm.updateSettings { s -> s.copy(localPort = p) } } }, label = "TCP port (127.0.0.1)", keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
                 Spacer(Modifier.height(10.dp))
                 ShadSelect(settings.localStorageDriver, listOf("overlay2", "vfs", "fuse-overlayfs"), { d -> vm.updateSettings { it.copy(localStorageDriver = d) } }, label = "Storage driver")
+                if (status.overlaySupported == false && settings.localStorageDriver == "overlay2") {
+                    Spacer(Modifier.height(4.dp))
+                    Text("This kernel has no overlayfs, so vfs is used instead.", style = MaterialTheme.typography.labelSmall, color = c.warning)
+                }
                 Spacer(Modifier.height(4.dp))
                 SwitchRow("iptables NAT", "Disable if the kernel lacks netfilter (containers lose outbound NAT).", checked = settings.localIptables, onCheckedChange = { v -> vm.updateSettings { it.copy(localIptables = v) } })
                 var extra by remember(settings.localExtraArgs) { mutableStateOf(settings.localExtraArgs) }

@@ -13,7 +13,7 @@ android {
         applicationId = "com.krstech.dockers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
+        versionCode = 3
         versionName = rootProject.file("VERSION").takeIf { it.exists() }?.readText()?.trim() ?: "1.1.0"
         vectorDrawables { useSupportLibrary = true }
 

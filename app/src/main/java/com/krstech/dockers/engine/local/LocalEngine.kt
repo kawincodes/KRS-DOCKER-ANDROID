@@ -33,6 +33,12 @@ class LocalEngine(private val context: Context) {
         val busy: Boolean = false,
         val progress: String? = null,
         val lastError: String? = null,
+        /** Docker API answered on 127.0.0.1:<port> (null = not checked / not running). */
+        val apiOk: Boolean? = null,
+        /** False when the kernel lacks features runc needs to create any container. Null = unknown. */
+        val containersSupported: Boolean? = null,
+        val missingCritical: List<String> = emptyList(),
+        val overlaySupported: Boolean? = null,
     )
 
     data class Options(
@@ -63,7 +69,7 @@ class LocalEngine(private val context: Context) {
         else -> "aarch64"
     }
 
-    suspend fun refresh() {
+    suspend fun refresh(port: Int = DEFAULT_PORT) {
         val root = RootShell.isAvailable()
         val installed = File(binDir, "dockerd").exists()
         val running = isRunning()
@@ -73,7 +79,15 @@ class LocalEngine(private val context: Context) {
             installedVersion = versionFile.takeIf { it.exists() }?.readText()?.trim(),
             running = running.first,
             pid = running.second,
+            apiOk = if (running.first) pingApi(port) else null,
         )
+    }
+
+    suspend fun pingApi(port: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            OkHttpClient.Builder().connectTimeout(2, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
+                .newCall(Request.Builder().url("http://127.0.0.1:$port/_ping").build()).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
     }
 
     suspend fun runChecks(): List<Check> {
@@ -86,16 +100,23 @@ class LocalEngine(private val context: Context) {
         checks += Check("Kernel", kernel.isNotBlank(), kernel.ifBlank { "unknown" }, required = false)
 
         val fsList = RootShell.run("cat /proc/filesystems")?.stdout.orEmpty()
-        checks += Check("overlayfs", fsList.contains("overlay"), if (fsList.contains("overlay")) "Available (overlay2 storage driver)" else "Missing: storage driver falls back to vfs (slow, large).", required = false)
+        val overlay = fsList.contains("overlay")
+        checks += Check("overlayfs", overlay, if (overlay) "Available (overlay2 storage driver)" else "Missing: the vfs storage driver will be used (slow, uses more space).", required = false)
         checks += Check("cgroup filesystem", fsList.contains("cgroup"), if (fsList.contains("cgroup2")) "cgroup v2" else if (fsList.contains("cgroup")) "cgroup v1" else "No cgroup support in kernel.")
 
         val cfg = RootShell.run("if [ -f /proc/config.gz ]; then gzip -dc /proc/config.gz 2>/dev/null || zcat /proc/config.gz; fi", 20_000)?.stdout.orEmpty()
+        var critical: List<String>? = null
         if (cfg.isBlank()) {
             checks += Check("Kernel config", false, "/proc/config.gz unavailable; cannot verify namespaces. Will try anyway.", required = false)
         } else {
             val required = listOf("CONFIG_NAMESPACES", "CONFIG_NET_NS", "CONFIG_PID_NS", "CONFIG_IPC_NS", "CONFIG_UTS_NS", "CONFIG_CGROUPS", "CONFIG_CGROUP_CPUACCT", "CONFIG_CGROUP_DEVICE", "CONFIG_CGROUP_FREEZER", "CONFIG_CGROUP_SCHED", "CONFIG_CPUSETS", "CONFIG_MEMCG", "CONFIG_VETH", "CONFIG_BRIDGE", "CONFIG_NETFILTER_XT_MATCH_ADDRTYPE", "CONFIG_NETFILTER_XT_MATCH_CONNTRACK", "CONFIG_NF_NAT", "CONFIG_POSIX_MQUEUE", "CONFIG_KEYS")
             val missing = required.filterNot { Regex("^$it=[ym]", RegexOption.MULTILINE).containsMatchIn(cfg) }
-            checks += Check("Kernel namespaces & netfilter", missing.isEmpty(), if (missing.isEmpty()) "All required options enabled" else "Missing: ${missing.joinToString(", ")}", required = missing.any { it.startsWith("CONFIG_NAMESPACES") || it.endsWith("_NS") || it == "CONFIG_CGROUPS" })
+            // runc creates mount, PID, IPC, UTS and network namespaces for every container and needs
+            // a device controller (cgroup v1 "devices" or cgroup v2 + BPF). Without them no container starts.
+            val hasDeviceControl = "CONFIG_CGROUP_DEVICE" !in missing || Regex("^CONFIG_CGROUP_BPF=y", RegexOption.MULTILINE).containsMatchIn(cfg)
+            critical = missing.filter { it == "CONFIG_NAMESPACES" || it.endsWith("_NS") || it == "CONFIG_CGROUPS" } +
+                (if (hasDeviceControl) emptyList() else listOf("CONFIG_CGROUP_DEVICE"))
+            checks += Check("Kernel namespaces & netfilter", missing.isEmpty(), if (missing.isEmpty()) "All required options enabled" else "Missing: ${missing.joinToString(", ")}", required = critical.isNotEmpty())
             val optional = listOf("CONFIG_USER_NS", "CONFIG_SECCOMP", "CONFIG_CGROUP_PIDS", "CONFIG_BLK_CGROUP", "CONFIG_OVERLAY_FS", "CONFIG_IP_NF_TARGET_MASQUERADE", "CONFIG_IP_VS")
             val missingOpt = optional.filterNot { Regex("^$it=[ym]", RegexOption.MULTILINE).containsMatchIn(cfg) }
             checks += Check("Optional kernel features", missingOpt.isEmpty(), if (missingOpt.isEmpty()) "All optional features present" else "Missing: ${missingOpt.joinToString(", ")}", required = false)
@@ -109,7 +130,10 @@ class LocalEngine(private val context: Context) {
         runCatching { File(binDir, ".x").delete() }
         checks += Check("Architecture", true, "${Build.SUPPORTED_ABIS.first()} -> docker static build '$arch'", required = false)
 
-        _status.value = _status.value.copy(rootAvailable = root, checks = checks)
+        _status.value = _status.value.copy(
+            rootAvailable = root, checks = checks, overlaySupported = overlay,
+            containersSupported = critical?.isEmpty(), missingCritical = critical.orEmpty(),
+        )
         return checks
     }
 
@@ -177,14 +201,25 @@ class LocalEngine(private val context: Context) {
             putExtra(EngineService.EXTRA_LOG, logFile.absolutePath)
         }
         context.startForegroundService(intent)
-        // Poll for the daemon to come up.
+        // Poll until the Docker API answers (a pid alone doesn't mean the daemon initialised).
         var up = false
-        for (attempt in 0 until 60) {
+        var pid: Int? = null
+        for (attempt in 0 until 90) {
             kotlinx.coroutines.delay(1000)
             val r = isRunning()
-            if (r.first) { up = true; _status.value = _status.value.copy(running = true, pid = r.second); break }
+            pid = r.second
+            if (r.first && pingApi(options.port)) { up = true; break }
+            if (!r.first && attempt > 10) break
         }
-        _status.value = _status.value.copy(busy = false, progress = null, running = up, lastError = if (up) null else "dockerd did not start. See the daemon log.")
+        val running = isRunning()
+        _status.value = _status.value.copy(
+            busy = false, progress = null, running = running.first, pid = running.second ?: pid, apiOk = up,
+            lastError = when {
+                up -> null
+                running.first -> "dockerd is running but its API never answered. Check the daemon log."
+                else -> "dockerd exited during startup. See the daemon log."
+            },
+        )
     }
 
     suspend fun stop() {
