@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: ["**"]
+    paths: ["VERSION"]
   workflow_dispatch:
     inputs:
       version:
@@ -58,9 +60,11 @@ jobs:
       - name: Sign release APK
         run: |
           BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          # Version comes from (in order): manual input, the pushed v* tag, or the VERSION file.
           VERSION="${{ github.event.inputs.version }}"
-          [ -n "$VERSION" ] || VERSION="${GITHUB_REF_NAME#v}"
-          [ "$GITHUB_REF_TYPE" = "tag" ] || [ -n "${{ github.event.inputs.version }}" ] || VERSION="$(git rev-parse --short HEAD)"
+          if [ -z "$VERSION" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          if [ -z "$VERSION" ] && [ -f VERSION ]; then VERSION="$(tr -d '[:space:]' < VERSION)"; fi
+          [ -n "$VERSION" ] || VERSION="$(git rev-parse --short HEAD)"
           mkdir -p dist
           "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk dist/aligned.apk
           "$BT/apksigner" sign --ks keystore.jks --ks-pass "pass:$KS_PASS" --ks-key-alias "$KS_ALIAS" --key-pass "pass:$KEY_PASS" \
@@ -78,7 +82,7 @@ jobs:
           path: dist/*
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.version != ''
+        # Runs for v* tags, manual dispatch, and pushes that change the VERSION file.
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}

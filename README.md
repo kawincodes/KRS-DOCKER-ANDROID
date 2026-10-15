@@ -87,4 +87,4 @@ Docker and the Docker logo are trademarks of Docker, Inc. KRS Dockers is an inde
 
 ## Releases
 
-Pushing a tag like `v1.0.0` (or running the workflow manually with a version input) runs `.github/workflows/release.yml`, which builds, signs and publishes the APKs to [GitHub Releases](https://github.com/kawincodes/KRS-DOCKER-ANDROID/releases). Add these repository secrets to sign with your own key (otherwise a throwaway key is used): `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+Pushing a tag like `v1.0.0`, changing the `VERSION` file, or running the workflow manually with a version input runs `.github/workflows/release.yml`, which builds, signs and publishes the APKs to [GitHub Releases](https://github.com/kawincodes/KRS-DOCKER-ANDROID/releases). Add these repository secrets to sign with your own key (otherwise a throwaway key is used): `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
