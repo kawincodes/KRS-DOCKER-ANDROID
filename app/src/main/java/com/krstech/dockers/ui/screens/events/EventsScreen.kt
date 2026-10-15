@@ -35,7 +35,7 @@ fun EventsScreen(nav: NavHostController) {
     val c = ShadTheme.colors
     Column(Modifier.fillMaxSize()) {
         ShadTopBar("Events", subtitle = "docker events (live)", onBack = { nav.popBackStack() })
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             if (events.isEmpty()) EmptyState("Waiting for events", "Container, image, volume and network events appear here as they happen.", icon = Lucide.Activity)
             else LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(events, key = { "${it.timeNano}-${it.actor.id}-${it.action}" }) { ev ->

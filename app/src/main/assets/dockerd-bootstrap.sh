@@ -52,7 +52,7 @@ IPTFLAG="--iptables=true --ip6tables=false"
 
 log "exec dockerd (driver=$DRIVER port=$PORT)"
 exec "$BIN/dockerd" \
-  --host "tcp://127.0.0.1:$PORT" \
+  --host "tcp://127.0.0.1:$PORT" --tls=false \
   --host "unix://$SOCK" \
   --data-root "$DATA" \
   --exec-root "$EXEC" \

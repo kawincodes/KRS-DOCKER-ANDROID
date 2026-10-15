@@ -35,6 +35,7 @@ import com.krstech.dockers.ui.navigation.AppNavHost
 import com.krstech.dockers.ui.navigation.bottomTabs
 import com.krstech.dockers.ui.theme.KRSDockersTheme
 import com.krstech.dockers.ui.theme.ShadTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -42,6 +43,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = (application as DockersApp).container
+        // Docker Desktop-style auto start of the built-in VM.
+        if (savedInstanceState == null) {
+            kotlinx.coroutines.MainScope().launch {
+                val s = container.settings.settings.first()
+                if (s.vmAutoStart && !container.vm.isRunning && container.engine.client == null) container.vm.start()
+            }
+        }
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
             CompositionLocalProvider(LocalAppContainer provides container) {

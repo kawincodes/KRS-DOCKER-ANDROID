@@ -20,7 +20,7 @@ import java.io.OutputStream
  *  - [Exec]: `docker exec -it` via the hijacked HTTP connection (remote echo, real TTY).
  *  - [Local]: a process on the phone (`/system/bin/sh` or `su`) through plain pipes.
  */
-abstract class TerminalSession(protected val scope: CoroutineScope) {
+abstract class LineSession(protected val scope: CoroutineScope) {
     data class State(val output: String = "", val connected: Boolean = false, val exited: Boolean = false, val error: String? = null)
 
     protected val _state = MutableStateFlow(State())
@@ -70,7 +70,7 @@ abstract class TerminalSession(protected val scope: CoroutineScope) {
 
     open fun close() { readJob?.cancel(); runCatching { out?.close() } }
 
-    class Exec(scope: CoroutineScope, private val client: DockerClient, private val containerId: String, private val cmd: List<String>, private val user: String? = null) : TerminalSession(scope) {
+    class Exec(scope: CoroutineScope, private val client: DockerClient, private val containerId: String, private val cmd: List<String>, private val user: String? = null) : LineSession(scope) {
         private var conn: HijackedConnection? = null
         private var execId: String? = null
         override suspend fun open() {
@@ -90,7 +90,7 @@ abstract class TerminalSession(protected val scope: CoroutineScope) {
         override fun close() { super.close(); runCatching { conn?.close() } }
     }
 
-    class Local(scope: CoroutineScope, private val root: Boolean) : TerminalSession(scope) {
+    class Local(scope: CoroutineScope, private val root: Boolean) : LineSession(scope) {
         private var process: Process? = null
         override suspend fun open() = withContext(Dispatchers.IO) {
             try {

@@ -36,6 +36,7 @@ import com.krstech.dockers.engine.model.ContainerSummary
 import com.krstech.dockers.engine.model.SystemDf
 import com.krstech.dockers.engine.profile.EngineProfile
 import com.krstech.dockers.engine.profile.EngineType
+import com.krstech.dockers.engine.vm.VmManager.Phase as P
 import com.krstech.dockers.ui.LocalAppContainer
 import com.krstech.dockers.ui.appViewModel
 import com.krstech.dockers.ui.components.*
@@ -82,6 +83,7 @@ fun DashboardScreen(nav: NavHostController) {
     val engine by app.engine.state.collectAsStateWithLifecycle()
     val profiles by app.profiles.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val localStatus by app.localEngine.status.collectAsStateWithLifecycle()
+    val vmStatus by app.vm.status.collectAsStateWithLifecycle()
     val toast = LocalToast.current
     val c = ShadTheme.colors
     var showRun by remember { mutableStateOf(false) }
@@ -96,7 +98,7 @@ fun DashboardScreen(nav: NavHostController) {
                 is EngineState.Connected -> {
                     ShadCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(when (e.profile.type) { EngineType.LOCAL -> Lucide.Smartphone; EngineType.WSL -> Lucide.Monitor; EngineType.REMOTE -> Lucide.Server }, null, tint = c.success, modifier = Modifier.size(22.dp))
+                            Icon(when (e.profile.type) { EngineType.VM -> Lucide.Container; EngineType.LOCAL -> Lucide.Smartphone; EngineType.WSL -> Lucide.Monitor; EngineType.REMOTE -> Lucide.Server }, null, tint = c.success, modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(e.profile.name, style = MaterialTheme.typography.titleMedium, color = c.foreground)
@@ -106,6 +108,9 @@ fun DashboardScreen(nav: NavHostController) {
                             ShadBadge("online", BadgeVariant.Success, dot = true)
                         }
                         e.info.warnings?.takeIf { it.isNotEmpty() }?.let { w -> Spacer(Modifier.height(8.dp)); Text(w.joinToString("\n"), style = MaterialTheme.typography.labelSmall, color = c.warning) }
+                    }
+                    if (e.profile.type == EngineType.VM && vmStatus.ports.isNotEmpty()) ShadCard(onClick = { nav.navigate(Routes.VM_ENGINE) }) {
+                        CardHeader("Forwarded ports", vmStatus.ports.joinToString("  ") { "${it.guestPort}→:${it.hostPort}" })
                     }
                     ErrorBanner(state.error)
                     val running = state.containers.count { it.isRunning }
@@ -156,6 +161,7 @@ fun DashboardScreen(nav: NavHostController) {
                 }
                 is EngineState.Connecting -> ShadCard { Row(verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = c.foreground); Spacer(Modifier.width(12.dp)); Text("Connecting to ${e.profile.name}…", color = c.foreground) } }
                 is EngineState.Error -> {
+                    if (e.profile.type == EngineType.VM) VmHeroCard(vmStatus, onOpen = { nav.navigate(Routes.VM_ENGINE) }, onStart = { app.vm.start() })
                     ErrorBanner("${e.profile.name}: ${e.message}")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ShadButton(onClick = { app.engine.connect(e.profile) }, variant = ButtonVariant.Outline, leadingIcon = Lucide.RefreshCw, modifier = Modifier.weight(1f)) { ButtonText("Retry") }
@@ -163,10 +169,12 @@ fun DashboardScreen(nav: NavHostController) {
                     }
                 }
                 EngineState.Disconnected -> {
+                    VmHeroCard(vmStatus, onOpen = { nav.navigate(Routes.VM_ENGINE) }, onStart = { app.vm.start() })
                     ShadCard {
                         CardHeader("Welcome to KRS Dockers", "Docker Desktop, in your pocket. Pick where your Docker engine runs.")
                         Spacer(Modifier.height(12.dp))
-                        EngineChoice(Lucide.Smartphone, "This device (root)", if (localStatus.running) "dockerd is running" else "Install dockerd and run containers natively. Needs root + compatible kernel.") { nav.navigate(Routes.LOCAL_ENGINE) }
+                        EngineChoice(Lucide.Container, "This phone (no root)", "Docker in a built-in Linux VM. Works on any 64-bit phone.") { nav.navigate(Routes.VM_ENGINE) }
+                        EngineChoice(Lucide.Smartphone, "This phone (root)", if (localStatus.running) "dockerd is running" else "Native dockerd at full speed. Needs root + compatible kernel.") { nav.navigate(Routes.LOCAL_ENGINE) }
                         EngineChoice(Lucide.Monitor, "Windows PC with WSL2", "Connect to Docker Desktop's WSL2 backend over your LAN.") { nav.navigate(Routes.engineEdit(type = EngineType.WSL.name)) }
                         EngineChoice(Lucide.Server, "Remote host", "Any tcp:// Docker daemon, optionally with TLS certificates.") { nav.navigate(Routes.engineEdit(type = EngineType.REMOTE.name)) }
                     }
@@ -176,7 +184,7 @@ fun DashboardScreen(nav: NavHostController) {
                         profiles.forEach { p: EngineProfile ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) { Text(p.name, style = MaterialTheme.typography.titleSmall, color = c.foreground); Text(p.url, style = MaterialTheme.typography.bodySmall, color = c.mutedForeground) }
-                                ShadButton(onClick = { if (p.type == EngineType.LOCAL && !localStatus.running) nav.navigate(Routes.LOCAL_ENGINE) else app.engine.connect(p) }, size = ButtonSize.Sm, variant = ButtonVariant.Outline, leadingIcon = Lucide.Plug) { ButtonText("Connect") }
+                                ShadButton(onClick = { when { p.type == EngineType.VM -> nav.navigate(Routes.VM_ENGINE); p.type == EngineType.LOCAL && !localStatus.running -> nav.navigate(Routes.LOCAL_ENGINE); else -> app.engine.connect(p) } }, size = ButtonSize.Sm, variant = ButtonVariant.Outline, leadingIcon = Lucide.Plug) { ButtonText("Connect") }
                             }
                         }
                     }
@@ -195,5 +203,41 @@ private fun EngineChoice(icon: androidx.compose.ui.graphics.vector.ImageVector, 
         Icon(icon, null, tint = c.foreground, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleSmall, color = c.foreground); Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.mutedForeground) }
         Icon(Lucide.ChevronRight, null, tint = c.mutedForeground, modifier = Modifier.size(16.dp))
+    }
+}
+
+/** Big "Start Docker" card for the built-in VM, shown while no engine is connected. */
+@Composable
+private fun VmHeroCard(status: com.krstech.dockers.engine.vm.VmManager.Status, onOpen: () -> Unit, onStart: () -> Unit) {
+    val c = ShadTheme.colors
+    if (status.phase == P.UNSUPPORTED) return
+    ShadCard(onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.Container, null, tint = if (status.phase == P.RUNNING) c.success else c.foreground, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Run Docker on this phone", style = MaterialTheme.typography.titleMedium, color = c.foreground)
+                Text(
+                    when (status.phase) {
+                        P.NOT_INSTALLED -> "No root needed. One-time ~190 MB download."
+                        P.DOWNLOADING -> status.message ?: "Downloading…"
+                        P.INSTALLING -> "Installing…"
+                        P.STARTING -> "Starting Docker… this takes a minute or two."
+                        P.RUNNING -> "Running · connecting…"
+                        P.STOPPING -> "Stopping…"
+                        P.ERROR -> status.message ?: "Stopped unexpectedly"
+                        else -> "Ready to start"
+                    },
+                    style = MaterialTheme.typography.bodySmall, color = c.mutedForeground,
+                )
+            }
+        }
+        if (status.phase == P.DOWNLOADING) { Spacer(Modifier.height(10.dp)); ShadProgress(status.progress ?: 0f) }
+        Spacer(Modifier.height(12.dp))
+        when (status.phase) {
+            P.STOPPED, P.ERROR -> ShadButton(onClick = onStart, leadingIcon = Lucide.Play, modifier = Modifier.fillMaxWidth()) { ButtonText("Start Docker") }
+            P.NOT_INSTALLED -> ShadButton(onClick = onOpen, leadingIcon = Lucide.Download, modifier = Modifier.fillMaxWidth()) { ButtonText("Set up Docker") }
+            else -> ShadButton(onClick = onOpen, variant = ButtonVariant.Outline, leadingIcon = Lucide.ScrollText, modifier = Modifier.fillMaxWidth()) { ButtonText("Details") }
+        }
     }
 }

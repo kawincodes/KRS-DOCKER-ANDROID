@@ -44,7 +44,7 @@ import kotlinx.serialization.json.JsonElement
 
 /** Shows [content] only when an engine is connected; otherwise a call-to-action to the Engines screen. */
 @Composable
-fun ConnectionGate(onOpenEngines: () -> Unit, content: @Composable (EngineState.Connected) -> Unit) {
+fun ConnectionGate(onOpenEngines: () -> Unit, onOpenVm: (() -> Unit)? = null, content: @Composable (EngineState.Connected) -> Unit) {
     val engine = LocalAppContainer.current.engine
     val state by engine.state.collectAsStateWithLifecycle()
     when (val s = state) {
@@ -57,8 +57,12 @@ fun ConnectionGate(onOpenEngines: () -> Unit, content: @Composable (EngineState.
                 ShadButton(onClick = onOpenEngines) { ButtonText("Engines") }
             }
         })
-        EngineState.Disconnected -> EmptyState("No engine connected", "Connect to a Docker daemon: this device (root), a remote host, or Docker Desktop on Windows via WSL2.", icon = Lucide.Plug, action = {
-            ShadButton(onClick = onOpenEngines) { ButtonText("Choose an engine") }
+        EngineState.Disconnected -> EmptyState("Docker isn't running", "Start Docker on this phone (no root needed), or connect to a remote host or Docker Desktop on Windows via WSL2.", icon = Lucide.Plug, action = {
+            Row {
+                ShadButton(onClick = onOpenVm ?: onOpenEngines) { ButtonText("Start Docker") }
+                Spacer(Modifier.width(8.dp))
+                ShadButton(onClick = onOpenEngines, variant = ButtonVariant.Outline) { ButtonText("Remote") }
+            }
         })
     }
 }

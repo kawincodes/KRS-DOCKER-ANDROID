@@ -149,7 +149,7 @@ fun DistrosScreen(nav: NavHostController) {
                 MenuAction("Import from tarball", Lucide.Import) { importName = "" },
             ), icon = Lucide.EllipsisVertical)
         }
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             Column(Modifier.fillMaxSize()) {
                 ErrorBanner(state.error, Modifier.padding(16.dp))
                 state.log?.let { LogView(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp).height(160.dp)) }

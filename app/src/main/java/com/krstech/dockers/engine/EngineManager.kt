@@ -88,6 +88,8 @@ class EngineManager(
             val list = profiles.current()
             val active = profiles.activeId.first()
             val target = list.firstOrNull { it.id == active } ?: list.firstOrNull { it.autoConnect } ?: return@launch
+            // The on-device engines connect themselves once they are up.
+            if (target.type == com.krstech.dockers.engine.profile.EngineType.VM) return@launch
             if (target.type == com.krstech.dockers.engine.profile.EngineType.LOCAL && !target.autoConnect) return@launch
             connect(target)
         }

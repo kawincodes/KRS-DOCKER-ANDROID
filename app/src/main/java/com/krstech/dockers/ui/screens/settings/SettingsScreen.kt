@@ -72,12 +72,14 @@ fun AboutScreen(nav: NavHostController) {
             ShadCard {
                 CardHeader("KRS Dockers", "v${BuildConfig.VERSION_NAME} · ${BuildConfig.APPLICATION_ID}")
                 Spacer(Modifier.height(8.dp))
-                Text("A Docker Desktop-style manager for Android by KRS Tech Solutions. Runs dockerd on rooted devices, or connects to any Docker Engine over the network, including Docker Desktop's WSL2 backend on Windows.", style = MaterialTheme.typography.bodyMedium, color = c.mutedForeground)
+                Text("A Docker Desktop-style manager for Android by KRS Tech Solutions. Runs Docker on the phone in a built-in Linux VM (no root), natively on rooted devices, or connects to any Docker Engine over the network, including Docker Desktop's WSL2 backend on Windows.", style = MaterialTheme.typography.bodyMedium, color = c.mutedForeground)
             }
             ShadCard {
                 CardHeader("Built with")
                 KeyValueRow("UI", "Jetpack Compose · shadcn/ui-style components · Lucide icons")
                 KeyValueRow("Engine", "Docker Engine API v1.43 over OkHttp (TCP, TLS, Unix sockets)")
+                KeyValueRow("No-root engine", "QEMU (GPL-2.0, Termux build) running Alpine Linux + Docker Engine")
+                KeyValueRow("Terminal", "Termux terminal-emulator/view (Apache-2.0) · Docker CLI (Apache-2.0)")
                 KeyValueRow("Compose", "docker:cli helper container")
                 KeyValueRow("Distros", "WSL-style containers with persistent home volumes")
             }

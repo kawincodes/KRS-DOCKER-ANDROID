@@ -14,6 +14,7 @@ import com.krstech.dockers.ui.screens.distros.DistrosScreen
 import com.krstech.dockers.ui.screens.engines.EngineEditorScreen
 import com.krstech.dockers.ui.screens.engines.EnginesScreen
 import com.krstech.dockers.ui.screens.engines.LocalEngineScreen
+import com.krstech.dockers.ui.screens.engines.VmEngineScreen
 import com.krstech.dockers.ui.screens.events.EventsScreen
 import com.krstech.dockers.ui.screens.images.ImagesScreen
 import com.krstech.dockers.ui.screens.networks.NetworksScreen
@@ -51,6 +52,7 @@ fun AppNavHost(nav: NavHostController) {
             EngineEditorScreen(nav, it.arguments?.getString("id").orEmpty().ifBlank { null }, it.arguments?.getString("type").orEmpty().ifBlank { null })
         }
         composable(Routes.LOCAL_ENGINE) { LocalEngineScreen(nav) }
+        composable(Routes.VM_ENGINE) { VmEngineScreen(nav) }
         composable(Routes.SETTINGS) { SettingsScreen(nav) }
         composable(Routes.EVENTS) { EventsScreen(nav) }
         composable(Routes.ABOUT) { AboutScreen(nav) }

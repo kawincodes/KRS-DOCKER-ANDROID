@@ -1,12 +1,26 @@
 # KRS Dockers
 
-**Docker Desktop for Android.** A Jetpack Compose app (`com.krstech.dockers`) that runs a Docker engine on a rooted phone, or drives any remote Docker daemon, including Docker Desktop's WSL2 backend on Windows, with a Docker Desktop-style UI.
+**Docker Desktop for Android.** A Jetpack Compose app (`com.krstech.dockers`) that runs Docker **on the phone itself, without root**, using a built-in Linux VM. It can also run native `dockerd` on rooted phones, or drive any remote Docker daemon, including Docker Desktop's WSL2 backend on Windows, all with a Docker Desktop-style UI.
 
 | | |
 |---|---|
 | UI | Jetpack Compose + shadcn/ui-style component library (`ui/components`, zinc tokens) + [Lucide icons](https://lucide.dev) via `com.composables:icons-lucide` |
 | Engine | Docker Engine REST API v1.43 over OkHttp: `tcp://`, `tcp://` + TLS client certs, `unix://` (Android `LocalSocket`) |
 | Min SDK | 26 (Android 8.0) · target 35 |
+
+## Docker on the phone, no root (built-in VM)
+
+*More → Docker VM (no root)* downloads a ~190 MB image and boots it with QEMU, which is bundled in the APK. The image contains Alpine Linux 3.24 and Docker Engine 29.
+
+```
+App ──tcp 127.0.0.1:23750──▶ QEMU user-net ──▶ Alpine VM: dockerd :2375
+     ◀─ QMP hostfwd ─ published ports (-p 8080:80 → localhost:8080)
+```
+
+- **Executables in the APK.** Android 10+ only lets apps execute files from their `nativeLibraryDir`. `scripts/fetch-native.sh` therefore packages QEMU (from Termux packages, with its shared libraries renamed and patched by `scripts/termux_bundle.py`) and the static Docker CLI as `libqemu.so` / `libdocker.so` under `app/src/main/jniLibs/`.
+- **Image build.** `vm/build-image.sh` builds kernel + initramfs + a compressed qcow2 disk. The *VM image* workflow publishes them to the [`vm-1`](https://github.com/kawincodes/KRS-DOCKER-ANDROID/releases/tag/vm-1) release, and the app verifies the SHA-256 after download.
+- **Port forwarding.** A service in the VM announces published ports on the serial console. The app adds and removes QEMU host forwards over QMP. Ports below 1024 map to 10000 + port, because Android apps can't bind them.
+- **Background running.** A foreground service with a wake lock keeps the VM alive. The CPU is emulated (TCG), so expect lower performance than native.
 
 ## Features
 
@@ -25,7 +39,9 @@
 - **Windows / WSL2**: connect to Docker Desktop (or `dockerd` inside a WSL2 distro) over the LAN, with a one-tap `/24` scanner for ports 2375/2376 and an in-app setup guide.
 - **Remote**: any `tcp://host:port`, with `ca.pem` / `cert.pem` / `key.pem` TLS.
 
-**Events** live `docker events` stream; **Settings** theme (system/light/dark), log tail/timestamps, terminal font size; **Device shell** (`sh` / `su`).
+**Terminal** real PTY terminal (Termux `terminal-emulator`/`terminal-view`) with tabs and extra keys. The phone shell has the bundled `docker` CLI on PATH, wired to the connected engine. Container terminals run `docker exec -it`. A root shell (`su`) is available on rooted phones.
+
+**Events** live `docker events` stream; **Settings** theme (system/light/dark), log tail/timestamps, terminal font size.
 
 ## Running Docker on the phone itself: requirements
 
@@ -53,11 +69,14 @@ Port 2375 is unauthenticated; keep it on a trusted LAN or use 2376 with TLS (`do
 ## Build
 
 ```bash
-./gradlew :app:assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
+pip install patchelf                  # once
+scripts/fetch-native.sh               # bundle QEMU + docker CLI into app/src/main/jniLibs (needed for the VM)
+./gradlew :app:assembleDebug          # app/build/outputs/apk/debug/app-<abi>-debug.apk
 ./gradlew :app:testDebugUnitTest
+vm/build-image.sh aarch64 dist        # optional: build the VM image yourself (needs docker, mke2fs, qemu-img)
 ```
 
-Requires JDK 17+ and the Android SDK (platform 35). GitHub Actions (`.github/workflows/android.yml`) builds and uploads a debug APK on every push.
+Requires JDK 17+ and the Android SDK (platform 35). Builds made without `fetch-native.sh` still work, but the no-root VM and the bundled docker CLI are then unavailable. GitHub Actions (`.github/workflows/android.yml`) builds and uploads a debug APK on every push.
 
 ## Project layout
 
@@ -80,6 +99,13 @@ app/src/main/java/com/krstech/dockers
     ├── components/                       Button, Card, Badge, Input, Switch, Tabs, Select, Menu, Dialog, Sheet, Progress, Skeleton…
     └── screens/                          dashboard, containers, images, volumes, networks, stacks, distros, terminal, engines, settings, events
 ```
+
+## Third-party software
+
+- **QEMU** (GPL-2.0) and its libraries are taken unmodified from [Termux packages](https://github.com/termux/termux-packages). Only their names and ELF dependency entries are rewritten. Source is available from qemu.org and the Termux package repository.
+- **Docker CLI** (Apache-2.0), static build from download.docker.com.
+- **Termux terminal-emulator / terminal-view** (Apache-2.0).
+- **Alpine Linux** and **Docker Engine** inside the VM image, under their respective licenses.
 
 ## Disclaimer
 

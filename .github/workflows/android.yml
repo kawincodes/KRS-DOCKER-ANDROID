@@ -27,7 +27,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Cache native downloads
+        uses: actions/cache@v4
+        with:
+          path: .native-cache
+          key: native-${{ hashFiles('scripts/fetch-native.sh', 'scripts/termux_bundle.py') }}
+
+      - name: Bundle QEMU and Docker CLI (jniLibs)
+        run: |
+          pip install -q patchelf
+          scripts/fetch-native.sh
+
+      - name: Build debug APKs
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Run unit tests
@@ -38,3 +49,4 @@ jobs:
         with:
           name: krs-dockers-debug
           path: app/build/outputs/apk/debug/*.apk
+          compression-level: 0

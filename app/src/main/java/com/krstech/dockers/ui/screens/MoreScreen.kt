@@ -37,15 +37,17 @@ fun MoreScreen(nav: NavHostController) {
     Column(Modifier.fillMaxSize()) {
         ShadTopBar("More", subtitle = (state as? EngineState.Connected)?.let { "${it.profile.name} · Docker ${it.version.version}" } ?: "Not connected")
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionTitle("Docker on this phone")
+            MoreItem("Docker VM (no root)", "Run containers on this phone", Lucide.Container) { nav.navigate(Routes.VM_ENGINE) }
+            MoreItem("Root engine", "Native dockerd on rooted phones", Lucide.Smartphone) { nav.navigate(Routes.LOCAL_ENGINE) }
             SectionTitle("Resources")
             MoreItem("Volumes", "Persistent data", Lucide.HardDrive) { nav.navigate(Routes.VOLUMES) }
             MoreItem("Networks", "Bridges, overlays, macvlan", Lucide.Network) { nav.navigate(Routes.NETWORKS) }
             MoreItem("Stacks", "Docker Compose projects", Lucide.Boxes) { nav.navigate(Routes.STACKS) }
             MoreItem("Events", "Live daemon event stream", Lucide.Activity) { nav.navigate(Routes.EVENTS) }
             SectionTitle("Tools")
-            MoreItem("Device shell", "sh / su on this phone", Lucide.SquareTerminal) { nav.navigate(Routes.terminal()) }
-            MoreItem("Engines", "Local, remote and WSL2 daemons", Lucide.Server) { nav.navigate(Routes.ENGINES) }
-            MoreItem("Local engine", "Install & run dockerd (root)", Lucide.Smartphone) { nav.navigate(Routes.LOCAL_ENGINE) }
+            MoreItem("Terminal", "Phone shell with the docker CLI", Lucide.SquareTerminal) { nav.navigate(Routes.terminal()) }
+            MoreItem("Engines", "Phone VM, root, remote and WSL2 daemons", Lucide.Server) { nav.navigate(Routes.ENGINES) }
             SectionTitle("App")
             MoreItem("Settings", "Theme, logs, terminal", Lucide.Settings) { nav.navigate(Routes.SETTINGS) }
             MoreItem("About", "KRS Dockers", Lucide.Info) { nav.navigate(Routes.ABOUT) }

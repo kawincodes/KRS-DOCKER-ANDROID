@@ -169,7 +169,7 @@ fun ImagesScreen(nav: NavHostController) {
                 MenuAction("Prune dangling", Lucide.Trash2, destructive = true) { confirmPrune = true },
             ), icon = Lucide.EllipsisVertical)
         }
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             Column(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     ShadInput(state.query, vm::setQuery, placeholder = "Filter images", leadingIcon = Lucide.Search)

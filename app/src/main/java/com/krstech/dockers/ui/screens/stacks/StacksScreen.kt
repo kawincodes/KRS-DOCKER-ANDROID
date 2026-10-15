@@ -121,7 +121,7 @@ fun StacksScreen(nav: NavHostController) {
             ShadIconButton(Lucide.RefreshCw, "Refresh", onClick = { vm.load() })
             ShadIconButton(Lucide.Plus, "New stack", onClick = { editor = "my-stack" to ComposeRunner.DEFAULT_TEMPLATE })
         }
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             Column(Modifier.fillMaxSize()) {
                 ErrorBanner(state.error, Modifier.padding(16.dp))
                 state.output?.let { out ->

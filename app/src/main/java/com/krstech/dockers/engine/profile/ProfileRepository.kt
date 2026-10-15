@@ -23,7 +23,9 @@ class ProfileRepository(private val context: Context) {
 
     val profiles: Flow<List<EngineProfile>> = context.profileStore.data.map { prefs ->
         val stored = prefs[KEY_PROFILES]?.let { runCatching { json.decodeFromString(ListSerializer(EngineProfile.serializer()), it) }.getOrNull() }
-        stored ?: defaults()
+        val list = stored ?: defaults()
+        // Installs from before the VM engine existed: make sure the built-in VM profile is present.
+        if (list.none { it.id == VM_PROFILE_ID }) listOf(vmProfile()) + list else list
     }
 
     val activeId: Flow<String?> = context.profileStore.data.map { it[KEY_ACTIVE] }
@@ -50,10 +52,20 @@ class ProfileRepository(private val context: Context) {
         context.profileStore.edit { it[KEY_PROFILES] = json.encodeToString(ListSerializer(EngineProfile.serializer()), list) }
     }
 
+    fun vmProfile(port: Int = com.krstech.dockers.engine.vm.VmManager.DEFAULT_API_PORT) = EngineProfile(
+        id = VM_PROFILE_ID,
+        name = "This phone (Docker VM)",
+        type = EngineType.VM,
+        url = "tcp://127.0.0.1:$port",
+        hostSocketPath = "/var/run/docker.sock",
+        autoConnect = false,
+    )
+
     private fun defaults(): List<EngineProfile> = listOf(
+        vmProfile(),
         EngineProfile(
             id = LOCAL_PROFILE_ID,
-            name = "This device",
+            name = "This phone (root dockerd)",
             type = EngineType.LOCAL,
             url = "tcp://127.0.0.1:${LocalEngine.DEFAULT_PORT}",
             hostSocketPath = LocalEngine.socketPath(context),
@@ -69,5 +81,6 @@ class ProfileRepository(private val context: Context) {
 
     companion object {
         const val LOCAL_PROFILE_ID = "local-engine"
+        const val VM_PROFILE_ID = "vm-engine"
     }
 }

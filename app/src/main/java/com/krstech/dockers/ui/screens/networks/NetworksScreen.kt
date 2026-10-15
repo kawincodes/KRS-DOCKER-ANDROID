@@ -98,7 +98,7 @@ fun NetworksScreen(nav: NavHostController) {
             ShadIconButton(Lucide.Plus, "Create", onClick = { showCreate = true })
             ShadMenu(listOf(MenuAction("Refresh", Lucide.RefreshCw) { vm.load() }, MenuAction("Prune unused", Lucide.Trash2, destructive = true) { confirmPrune = true }), icon = Lucide.EllipsisVertical)
         }
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             Column(Modifier.fillMaxSize()) {
                 ErrorBanner(state.error, Modifier.padding(16.dp))
                 if (state.loading && state.networks.isEmpty()) Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { repeat(4) { ShadSkeleton(Modifier.fillMaxWidth().height(64.dp)) } }

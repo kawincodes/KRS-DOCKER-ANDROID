@@ -106,7 +106,7 @@ fun VolumesScreen(nav: NavHostController) {
             ShadIconButton(Lucide.Plus, "Create", onClick = { showCreate = true })
             ShadMenu(listOf(MenuAction("Refresh", Lucide.RefreshCw) { vm.load() }, MenuAction("Prune unused", Lucide.Trash2, destructive = true) { confirmPrune = true }), icon = Lucide.EllipsisVertical)
         }
-        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }) {
+        ConnectionGate(onOpenEngines = { nav.navigate(Routes.ENGINES) }, onOpenVm = { nav.navigate(Routes.VM_ENGINE) }) {
             Column(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) { ShadInput(state.query, vm::setQuery, placeholder = "Filter volumes", leadingIcon = Lucide.Search) }
                 ErrorBanner(state.error, Modifier.padding(horizontal = 16.dp))

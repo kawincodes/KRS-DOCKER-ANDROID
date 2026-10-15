@@ -63,3 +63,13 @@ class EngineUnitTest {
         assertEquals("1.5 KB", Format.bytes(1536)); assertEquals("100 MB", Format.bytes(100L * 1024 * 1024))
     }
 }
+
+class VmPortTest {
+    @Test
+    fun parsesPortAnnouncements() {
+        val spec = com.krstech.dockers.engine.vm.VmManager.parsePortSpec("tcp:8080 udp:53 tcp:2375 bogus tcp:x sctp:9 tcp:443 ")
+        assertEquals(setOf("tcp" to 8080, "udp" to 53, "tcp" to 443), spec)
+        assertEquals(10080, com.krstech.dockers.engine.vm.VmManager.hostPortFor(80))
+        assertEquals(8080, com.krstech.dockers.engine.vm.VmManager.hostPortFor(8080))
+    }
+}

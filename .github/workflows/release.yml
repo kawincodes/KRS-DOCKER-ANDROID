@@ -35,6 +35,17 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Cache native downloads
+        uses: actions/cache@v4
+        with:
+          path: .native-cache
+          key: native-${{ hashFiles('scripts/fetch-native.sh', 'scripts/termux_bundle.py') }}
+
+      - name: Bundle QEMU and Docker CLI (jniLibs)
+        run: |
+          pip install -q patchelf
+          scripts/fetch-native.sh
+
       - name: Build APKs
         run: ./gradlew :app:assembleRelease :app:assembleDebug --no-daemon
 
@@ -57,7 +68,7 @@ jobs:
             echo "::warning::No KEYSTORE_BASE64 secret; signed with a throwaway key (users must uninstall before upgrading)."
           fi
 
-      - name: Sign release APK
+      - name: Sign release APKs
         run: |
           BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
           # Version comes from (in order): manual input, the pushed v* tag, or the VERSION file.
@@ -66,13 +77,19 @@ jobs:
           if [ -z "$VERSION" ] && [ -f VERSION ]; then VERSION="$(tr -d '[:space:]' < VERSION)"; fi
           [ -n "$VERSION" ] || VERSION="$(git rev-parse --short HEAD)"
           mkdir -p dist
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk dist/aligned.apk
-          "$BT/apksigner" sign --ks keystore.jks --ks-pass "pass:$KS_PASS" --ks-key-alias "$KS_ALIAS" --key-pass "pass:$KEY_PASS" \
-            --out "dist/krs-dockers-v${VERSION}.apk" dist/aligned.apk
-          "$BT/apksigner" verify "dist/krs-dockers-v${VERSION}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/krs-dockers-v${VERSION}-debug.apk"
-          rm dist/aligned.apk
-          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          for f in app/build/outputs/apk/release/app-*-release-unsigned.apk; do
+            abi="$(basename "$f" | sed -E 's/^app-(.*)-release-unsigned\.apk$/\1/')"
+            name="krs-dockers-v${VERSION}-${abi}.apk"
+            [ "$abi" = "universal" ] && name="krs-dockers-v${VERSION}.apk"
+            "$BT/zipalign" -f -p 4 "$f" dist/aligned.apk
+            "$BT/apksigner" sign --ks keystore.jks --ks-pass "pass:$KS_PASS" --ks-key-alias "$KS_ALIAS" --key-pass "pass:$KEY_PASS" \
+              --out "dist/$name" dist/aligned.apk
+            "$BT/apksigner" verify "dist/$name"
+            rm dist/aligned.apk
+          done
+          cp app/build/outputs/apk/debug/app-universal-debug.apk "dist/krs-dockers-v${VERSION}-debug.apk"
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          ls -la dist
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Upload build artifacts
@@ -80,6 +97,7 @@ jobs:
         with:
           name: krs-dockers-${{ env.VERSION }}
           path: dist/*
+          compression-level: 0
 
       - name: Publish GitHub release
         # Runs for v* tags, manual dispatch, and pushes that change the VERSION file.

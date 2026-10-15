@@ -7,7 +7,8 @@ import java.util.UUID
 
 @Serializable
 enum class EngineType(val label: String, val description: String) {
-    LOCAL("Local engine (root)", "dockerd running on this device. Requires root and a kernel with namespaces, cgroups and overlayfs."),
+    VM("This phone (no root)", "Docker inside a lightweight Linux VM that runs in the app. Works on any 64-bit phone, no root needed."),
+    LOCAL("This phone (root)", "dockerd running natively on this device. Fastest, but requires root and a kernel with namespaces, cgroups and overlayfs."),
     REMOTE("Remote host", "Any Docker daemon reachable over tcp:// (optionally with TLS client certificates)."),
     WSL("Windows / WSL2 (Docker Desktop)", "Docker Desktop or dockerd inside a WSL2 distro, exposed on tcp://<pc-ip>:2375 or :2376 with TLS."),
 }

@@ -73,9 +73,9 @@ fun EnginesScreen(nav: NavHostController) {
             items(profiles, key = { it.id }) { p ->
                 val active = engineState.profileOrNull?.id == p.id
                 val connected = active && engineState is EngineState.Connected
-                ShadCard(contentPadding = PaddingValues(12.dp), onClick = { if (p.type == EngineType.LOCAL) nav.navigate(Routes.LOCAL_ENGINE) else app.engine.connect(p) }) {
+                ShadCard(contentPadding = PaddingValues(12.dp), onClick = { when (p.type) { EngineType.LOCAL -> nav.navigate(Routes.LOCAL_ENGINE); EngineType.VM -> nav.navigate(Routes.VM_ENGINE); else -> app.engine.connect(p) } }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(when (p.type) { EngineType.LOCAL -> Lucide.Smartphone; EngineType.WSL -> Lucide.Monitor; EngineType.REMOTE -> Lucide.Server }, null, tint = if (connected) c.success else c.mutedForeground, modifier = Modifier.size(20.dp))
+                        Icon(when (p.type) { EngineType.VM -> Lucide.Container; EngineType.LOCAL -> Lucide.Smartphone; EngineType.WSL -> Lucide.Monitor; EngineType.REMOTE -> Lucide.Server }, null, tint = if (connected) c.success else c.mutedForeground, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(p.name, style = MaterialTheme.typography.titleSmall, color = c.foreground)
@@ -89,9 +89,10 @@ fun EnginesScreen(nav: NavHostController) {
                         }
                         ShadMenu(buildList {
                             add(MenuAction("Connect", Lucide.Plug) { app.engine.connect(p) })
-                            if (p.type == EngineType.LOCAL) add(MenuAction("Manage local engine", Lucide.Settings2) { nav.navigate(Routes.LOCAL_ENGINE) })
-                            add(MenuAction("Edit", Lucide.Pencil) { nav.navigate(Routes.engineEdit(p.id)) })
-                            add(MenuAction("Delete", Lucide.Trash2, destructive = true) { deleteTarget = p })
+                            if (p.type == EngineType.LOCAL) add(MenuAction("Manage root engine", Lucide.Settings2) { nav.navigate(Routes.LOCAL_ENGINE) })
+                            if (p.type == EngineType.VM) add(MenuAction("Manage Docker VM", Lucide.Settings2) { nav.navigate(Routes.VM_ENGINE) })
+                            if (p.type != EngineType.VM) add(MenuAction("Edit", Lucide.Pencil) { nav.navigate(Routes.engineEdit(p.id)) })
+                            if (p.type != EngineType.VM) add(MenuAction("Delete", Lucide.Trash2, destructive = true) { deleteTarget = p })
                         }, icon = Lucide.EllipsisVertical)
                     }
                 }
@@ -117,7 +118,7 @@ fun EnginesScreen(nav: NavHostController) {
         ShadDialog(onDismiss = { showAdd = false }, title = "Add engine", description = "Where does the Docker daemon run?") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 EngineType.entries.forEach { t ->
-                    ShadCard(contentPadding = PaddingValues(12.dp), onClick = { showAdd = false; if (t == EngineType.LOCAL) nav.navigate(Routes.LOCAL_ENGINE) else nav.navigate(Routes.engineEdit(type = t.name)) }) {
+                    ShadCard(contentPadding = PaddingValues(12.dp), onClick = { showAdd = false; when (t) { EngineType.LOCAL -> nav.navigate(Routes.LOCAL_ENGINE); EngineType.VM -> nav.navigate(Routes.VM_ENGINE); else -> nav.navigate(Routes.engineEdit(type = t.name)) } }) {
                         Text(t.label, style = MaterialTheme.typography.titleSmall, color = c.foreground)
                         Text(t.description, style = MaterialTheme.typography.bodySmall, color = c.mutedForeground)
                     }
