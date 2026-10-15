@@ -18,6 +18,8 @@ object Routes {
     const val ENGINE_EDIT = "engines/edit?id={id}&type={type}"
     const val LOCAL_ENGINE = "engines/local"
     const val VM_ENGINE = "engines/vm"
+    const val ADB = "adb"
+    const val ADB_SHELL = "adb/shell"
     const val SETTINGS = "settings"
     const val EVENTS = "events"
     const val ABOUT = "about"

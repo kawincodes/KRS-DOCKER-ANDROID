@@ -1,3 +1,22 @@
+## 1.2.0: built-in ADB, Shizuku-style tasks
+
+### ADB connector built into the app (no root, no computer)
+*More → ADB & shell* pairs KRS Dockers with your phone's own **Wireless debugging** (Android 11+). It then gets **shell-user (uid 2000) privileges**, like Shizuku.
+
+- **Pairing from a notification.** Tap *Pair with Wireless debugging*, open *Pair device with pairing code*, and type the 6-digit code into the notification without leaving Settings. Split-screen manual entry also works.
+- **Shell service.** After pairing, the app starts its own shell service with `app_process`. Like Shizuku's server, it keeps running as the shell user until the next reboot, even after Wireless debugging is turned off.
+- **One-tap tasks:**
+  - *Keep Docker VM alive* turns off Android's phantom process killer, so the background VM is no longer killed.
+  - *Unrestricted background running* adds the app to the battery allowlist.
+  - *Allow notifications*, *Device & kernel info*, *Top processes*, and *KRS Dockers logs*.
+  - *Restore phantom process killer* undoes the first task.
+- **Custom commands.** Run any shell command and save it as your own task.
+- **ADB shell.** An interactive shell runs as the shell user.
+- **Docker VM shortcut.** The Docker VM screen now has a *Keep VM alive (via ADB)* button.
+- **Android 10 and older.** Run `adb tcpip 5555` once from a computer, then tap *Connect & start*.
+
+Docker itself still runs in the Docker VM. The shell user can't create containers, but ADB makes the VM reliable in the background.
+
 ## 1.1.1
 
 - **Root engine now explains incompatible kernels.** If the phone's kernel lacks the PID, IPC or UTS namespaces or device control, the root engine says containers can't run natively and offers the Docker VM instead. Many stock kernels, including 4.4-era Xiaomi "perf" kernels, are affected.
@@ -29,10 +48,10 @@ KRS Dockers now ships its own engine. Open **Docker VM (no root)** and tap **Dow
 ### Downloads
 | File | Use it for |
 |---|---|
-| `krs-dockers-v1.1.1-arm64-v8a.apk` | Almost all phones (recommended) |
-| `krs-dockers-v1.1.1-x86_64.apk` | x86_64 devices and emulators |
-| `krs-dockers-v1.1.1-armeabi-v7a.apk` | Old 32-bit phones (remote/root engines only) |
-| `krs-dockers-v1.1.1.apk` | Universal (all of the above) |
+| `krs-dockers-v1.2.0-arm64-v8a.apk` | Almost all phones (recommended) |
+| `krs-dockers-v1.2.0-x86_64.apk` | x86_64 devices and emulators |
+| `krs-dockers-v1.2.0-armeabi-v7a.apk` | Old 32-bit phones (remote/root engines only) |
+| `krs-dockers-v1.2.0.apk` | Universal (all of the above) |
 
 ### Known limits
 - The VM emulates its CPU in software, so containers run slower than on a PC. Small images (`alpine`, `*-slim`) work best.

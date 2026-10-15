@@ -109,4 +109,21 @@ abstract class LineSession(protected val scope: CoroutineScope) {
         }
         override fun close() { super.close(); runCatching { process?.destroy() } }
     }
+
+    /** Generic stream-backed session (e.g. the ADB / shell-service `sh -i`). */
+    class Stream(scope: CoroutineScope, private val opener: suspend () -> Pair<InputStream, OutputStream>, private val banner: String? = null) : LineSession(scope) {
+        private var input: InputStream? = null
+        override suspend fun open() {
+            try {
+                val (i, o) = opener()
+                input = i; out = o
+                _state.update { it.copy(connected = true, error = null) }
+                banner?.let { append(it + "\n") }
+                pump(i)
+            } catch (t: Throwable) {
+                _state.update { it.copy(error = t.message ?: "Failed to open shell", exited = true) }
+            }
+        }
+        override fun close() { super.close(); runCatching { input?.close() } }
+    }
 }

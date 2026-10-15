@@ -69,6 +69,7 @@ fun VmEngineScreen(nav: NavHostController) {
     var showConsole by remember { mutableStateOf(false) }
     var consoleInput by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
+    var adbResult by remember { mutableStateOf<String?>(null) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     fun update(block: (AppSettings) -> AppSettings) = scope.launch { app.settings.update(block) }
 
@@ -257,9 +258,23 @@ fun VmEngineScreen(nav: NavHostController) {
                     }, variant = ButtonVariant.Outline, size = ButtonSize.Sm, leadingIcon = Lucide.BatteryCharging) { ButtonText("Allow background running") }
                     Spacer(Modifier.height(10.dp))
                 }
-                Text("Android 12+ may kill busy background processes (\"phantom process killer\"). If the VM stops by itself, run once from a computer:", style = MaterialTheme.typography.bodySmall, color = c.mutedForeground)
+                Text("Android 12+ may kill busy background processes (\"phantom process killer\"). The built-in ADB connector can switch that off for you, without root or a computer.", style = MaterialTheme.typography.bodySmall, color = c.mutedForeground)
                 Spacer(Modifier.height(6.dp))
-                Text("adb shell settings put global settings_enable_monitor_phantom_procs false", style = MonoStyle, color = c.foreground)
+                val adbStatus by app.adb.status.collectAsStateWithLifecycle()
+                if (adbStatus.ready) {
+                    ShadButton(onClick = {
+                        scope.launch {
+                            val tasks = com.krstech.dockers.engine.adb.AdbTasks.builtIn(context.packageName).filter { it.id == "keep_vm_alive" || it.id == "background" }.filter { Build.VERSION.SDK_INT >= it.minSdk }
+                            val out = tasks.map { t -> runCatching { app.adb.exec(t.command) }.fold({ "${t.title}: ${if (it.ok) "done" else "exit ${it.exitCode}"}" }, { e -> "${t.title}: ${e.message}" }) }
+                            adbResult = out.joinToString("\n")
+                        }
+                    }, variant = ButtonVariant.Outline, size = ButtonSize.Sm, leadingIcon = Lucide.ShieldCheck) { ButtonText("Keep VM alive (via ADB)") }
+                    adbResult?.let { Spacer(Modifier.height(6.dp)); Text(it, style = MonoStyle, color = c.foreground) }
+                } else {
+                    ShadButton(onClick = { nav.navigate(Routes.ADB) }, variant = ButtonVariant.Outline, size = ButtonSize.Sm, leadingIcon = Lucide.ShieldCheck) { ButtonText("Set up built-in ADB") }
+                    Spacer(Modifier.height(6.dp))
+                    Text("Or from a computer: adb shell settings put global settings_enable_monitor_phantom_procs false", style = MonoStyle, color = c.mutedForeground)
+                }
                 Spacer(Modifier.height(10.dp))
                 Text("The VM emulates its CPU in software, so containers run slower than on a PC. Prefer small images (alpine, *-slim). Rooted phones can use the native root engine for full speed.", style = MaterialTheme.typography.bodySmall, color = c.mutedForeground)
             }

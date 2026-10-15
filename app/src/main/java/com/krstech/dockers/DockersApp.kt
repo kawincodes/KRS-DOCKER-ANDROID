@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 /** Manual dependency container (kept deliberately simple: no DI framework). */
 class AppContainer(app: Application) {
+    val appContext: android.content.Context = app
     val settings = SettingsRepository(app)
     val profiles = ProfileRepository(app)
     val engine = EngineManager(profiles)
@@ -25,9 +26,12 @@ class AppContainer(app: Application) {
     val distros = DistroManager()
     val vm = VmManager(app, settings)
     val terminals = TerminalSessions(app, this)
+    val adb = com.krstech.dockers.engine.adb.AdbManager(app)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
+        // A shell service started in an earlier session keeps running until reboot; pick it up.
+        adb.refresh()
         // When the VM's Docker API answers, connect to it (Docker Desktop-style "it just works").
         vm.onReady = {
             scope.launch {

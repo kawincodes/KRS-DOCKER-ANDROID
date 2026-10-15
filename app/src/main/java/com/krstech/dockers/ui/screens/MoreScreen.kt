@@ -47,6 +47,7 @@ fun MoreScreen(nav: NavHostController) {
             MoreItem("Events", "Live daemon event stream", Lucide.Activity) { nav.navigate(Routes.EVENTS) }
             SectionTitle("Tools")
             MoreItem("Terminal", "Phone shell with the docker CLI", Lucide.SquareTerminal) { nav.navigate(Routes.terminal()) }
+            MoreItem("ADB & shell (no root)", "Built-in ADB, Shizuku-style privileged tasks", Lucide.ShieldCheck) { nav.navigate(Routes.ADB) }
             MoreItem("Engines", "Phone VM, root, remote and WSL2 daemons", Lucide.Server) { nav.navigate(Routes.ENGINES) }
             SectionTitle("App")
             MoreItem("Settings", "Theme, logs, terminal", Lucide.Settings) { nav.navigate(Routes.SETTINGS) }

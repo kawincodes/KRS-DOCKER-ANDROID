@@ -12,6 +12,8 @@ coroutines = "1.10.2"
 okhttp = "4.12.0"
 lucide = "1.1.0"
 termux = "v0.118.1"
+libadb = "3.1.1"
+conscrypt = "2.5.3"
 junit = "4.13.2"
 
 [libraries]
@@ -34,6 +36,8 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 lucide-icons = { group = "com.composables", name = "icons-lucide", version.ref = "lucide" }
 termux-terminal-view = { group = "com.github.termux.termux-app", name = "terminal-view", version.ref = "termux" }
+libadb-android = { group = "com.github.MuntashirAkon", name = "libadb-android", version.ref = "libadb" }
+conscrypt-android = { group = "org.conscrypt", name = "conscrypt-android", version.ref = "conscrypt" }
 termux-terminal-emulator = { group = "com.github.termux.termux-app", name = "terminal-emulator", version.ref = "termux" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

@@ -19,7 +19,12 @@ dependencyResolutionManagement {
         // Termux terminal-emulator / terminal-view (Apache-2.0), built by JitPack.
         maven {
             url = uri("https://jitpack.io")
-            content { includeGroup("com.github.termux.termux-app") }
+            content {
+                includeGroup("com.github.termux.termux-app")
+                // libadb-android (ADB pairing/TLS client) and its SPAKE2 dependency.
+                includeGroup("com.github.MuntashirAkon")
+                includeGroup("com.github.MuntashirAkon.spake2-java")
+            }
         }
     }
 }

@@ -15,6 +15,8 @@ import com.krstech.dockers.ui.screens.engines.EngineEditorScreen
 import com.krstech.dockers.ui.screens.engines.EnginesScreen
 import com.krstech.dockers.ui.screens.engines.LocalEngineScreen
 import com.krstech.dockers.ui.screens.engines.VmEngineScreen
+import com.krstech.dockers.ui.screens.adb.AdbScreen
+import com.krstech.dockers.ui.screens.terminal.LegacyTerminalScreen
 import com.krstech.dockers.ui.screens.events.EventsScreen
 import com.krstech.dockers.ui.screens.images.ImagesScreen
 import com.krstech.dockers.ui.screens.networks.NetworksScreen
@@ -53,6 +55,8 @@ fun AppNavHost(nav: NavHostController) {
         }
         composable(Routes.LOCAL_ENGINE) { LocalEngineScreen(nav) }
         composable(Routes.VM_ENGINE) { VmEngineScreen(nav) }
+        composable(Routes.ADB) { AdbScreen(nav) }
+        composable(Routes.ADB_SHELL) { LegacyTerminalScreen(nav, containerId = null, title = "ADB shell", initialMode = "adb") }
         composable(Routes.SETTINGS) { SettingsScreen(nav) }
         composable(Routes.EVENTS) { EventsScreen(nav) }
         composable(Routes.ABOUT) { AboutScreen(nav) }

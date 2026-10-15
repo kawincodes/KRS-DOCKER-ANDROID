@@ -13,7 +13,7 @@ android {
         applicationId = "com.krstech.dockers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
+        versionCode = 4
         versionName = rootProject.file("VERSION").takeIf { it.exists() }?.readText()?.trim() ?: "1.1.0"
         vectorDrawables { useSupportLibrary = true }
 
@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.lucide.icons)
     implementation(libs.termux.terminal.view)
     implementation(libs.termux.terminal.emulator)
+    implementation(libs.libadb.android)
+    // TLS 1.3 + exportKeyingMaterial for Wireless debugging pairing (used by libadb-android).
+    implementation(libs.conscrypt.android)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

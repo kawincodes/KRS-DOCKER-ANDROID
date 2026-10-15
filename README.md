@@ -22,6 +22,14 @@ App ──tcp 127.0.0.1:23750──▶ QEMU user-net ──▶ Alpine VM: docker
 - **Port forwarding.** A service in the VM announces published ports on the serial console. The app adds and removes QEMU host forwards over QMP. Ports below 1024 map to 10000 + port, because Android apps can't bind them.
 - **Background running.** A foreground service with a wake lock keeps the VM alive. The CPU is emulated (TCG), so expect lower performance than native.
 
+## Built-in ADB connector (Shizuku-style, no root)
+
+*More → ADB & shell* pairs with the phone's own Wireless debugging and gets shell-user privileges:
+
+- **Pairing.** `libadb-android` handles SPAKE2 pairing and TLS 1.3 with a bundled Conscrypt. The app's identity is an RSA key with a self-signed certificate (`engine/adb/AdbKeys.kt`). The pairing port is found over mDNS, and the code can be typed into a notification (`AdbPairingService`).
+- **Shell service.** `shell/ShellServer.kt` is started over ADB with `app_process --nice-name=krs_shell`. It runs as uid 2000 until reboot, listens on 127.0.0.1 only, and requires a random 256-bit token. It serves `exec` (framed output plus exit code) and an interactive `sh -i`.
+- **Tasks.** Built-in tasks include *Keep Docker VM alive* (disables the phantom process killer), battery allowlisting, notification permission, device info, top processes and app logs. Custom commands can be saved as tasks.
+
 ## Features
 
 **Containers** list/search/filter, run (image, name, ports, env, binds, command, restart policy, network, tty, privileged, `--rm`), start / stop / restart / kill / pause / unpause / rename / remove, prune. Detail view with live **logs** (stdcopy demuxed), **inspect** JSON, live **stats** (CPU %, memory, net & block I/O, `top`), and an interactive **terminal** (`docker exec -it` over a hijacked connection).
@@ -105,6 +113,7 @@ app/src/main/java/com/krstech/dockers
 - **QEMU** (GPL-2.0) and its libraries are taken unmodified from [Termux packages](https://github.com/termux/termux-packages). Only their names and ELF dependency entries are rewritten. Source is available from qemu.org and the Termux package repository.
 - **Docker CLI** (Apache-2.0), static build from download.docker.com.
 - **Termux terminal-emulator / terminal-view** (Apache-2.0).
+- **libadb-android** and **spake2-java** by Muntashir Al-Islam (Apache-2.0 / GPL-3.0), **Conscrypt** (Apache-2.0), **Bouncy Castle** (MIT).
 - **Alpine Linux** and **Docker Engine** inside the VM image, under their respective licenses.
 
 ## Disclaimer

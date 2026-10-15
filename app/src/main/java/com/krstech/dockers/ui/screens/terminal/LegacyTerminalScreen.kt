@@ -58,6 +58,7 @@ class LegacyTerminalViewModel(private val app: AppContainer, private val contain
                 LineSession.Exec(viewModelScope, client, containerId!!, app.distros.shellCommand(), user)
             }
             "root" -> LineSession.Local(viewModelScope, root = true)
+            "adb" -> LineSession.Stream(viewModelScope, { app.adb.openInteractive() }, "# shell user (uid 2000) via built-in ADB")
             else -> LineSession.Local(viewModelScope, root = false)
         }
         session = s
@@ -68,11 +69,11 @@ class LegacyTerminalViewModel(private val app: AppContainer, private val contain
 }
 
 @Composable
-fun LegacyTerminalScreen(nav: NavHostController, containerId: String?, title: String?) {
-    val vm = appViewModel(key = "legacy-terminal-${containerId ?: "local"}") { LegacyTerminalViewModel(it, containerId) }
+fun LegacyTerminalScreen(nav: NavHostController, containerId: String?, title: String?, initialMode: String? = null) {
+    val vm = appViewModel(key = "legacy-terminal-${containerId ?: initialMode ?: "local"}") { LegacyTerminalViewModel(it, containerId) }
     val settings by LocalAppContainer.current.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val c = ShadTheme.colors
-    var mode by remember { mutableStateOf(if (containerId != null) "container" else "shell") }
+    var mode by remember { mutableStateOf(initialMode ?: if (containerId != null) "container" else "shell") }
     var input by remember { mutableStateOf("") }
     var history by remember { mutableStateOf(listOf<String>()) }
     var historyIdx by remember { mutableStateOf(-1) }
@@ -84,7 +85,7 @@ fun LegacyTerminalScreen(nav: NavHostController, containerId: String?, title: St
     val state by stateFlow.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        ShadTopBar(title ?: if (containerId != null) "Terminal" else "Device shell", subtitle = when (mode) { "container" -> "docker exec -it"; "root" -> "su"; else -> "/system/bin/sh" }, onBack = { nav.popBackStack() }) {
+        ShadTopBar(title ?: if (containerId != null) "Terminal" else "Device shell", subtitle = when (mode) { "container" -> "docker exec -it"; "root" -> "su"; "adb" -> "shell user (uid 2000) · built-in ADB"; else -> "/system/bin/sh" }, onBack = { nav.popBackStack() }) {
             ShadBadge(if (state.exited) "exited" else if (state.connected) "connected" else "connecting", if (state.exited) BadgeVariant.Secondary else if (state.connected) BadgeVariant.Success else BadgeVariant.Warning, dot = true)
             Spacer(Modifier.width(4.dp))
             ShadMenu(buildList {
