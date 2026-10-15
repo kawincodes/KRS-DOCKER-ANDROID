@@ -84,3 +84,7 @@ app/src/main/java/com/krstech/dockers
 ## Disclaimer
 
 Docker and the Docker logo are trademarks of Docker, Inc. KRS Dockers is an independent project by KRS Tech Solutions and is not affiliated with Docker, Inc.
+
+## Releases
+
+Pushing a tag like `v1.0.0` runs `.github/workflows/release.yml`, which builds, signs and publishes the APKs to [GitHub Releases](https://github.com/kawincodes/KRS-DOCKER-ANDROID/releases). Add these repository secrets to sign with your own key (otherwise a throwaway key is used): `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
