@@ -1,0 +1,75 @@
+name: VM image
+
+# Builds the Alpine + Docker virtual machine images that the app downloads to run Docker on
+# phones without root, and publishes them to the GitHub release "vm-<vm/VERSION>".
+on:
+  push:
+    paths: ["vm/**", ".github/workflows/vm-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+          - arch: x86_64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install image tools
+        run: sudo apt-get update -q && sudo apt-get install -y -q qemu-utils e2fsprogs
+      - name: Build image
+        run: vm/build-image.sh ${{ matrix.arch }} dist
+      - name: Boot test (x86_64 only, TCG)
+        if: matrix.arch == 'x86_64'
+        run: |
+          sudo apt-get install -y -q qemu-system-x86
+          mkdir run && tar -C run -xf dist/krs-vm-x86_64.tar
+          CMDLINE=$(python3 -c "import json;print(json.load(open('run/manifest.json'))['cmdline'])")
+          qemu-system-x86_64 -M q35 -cpu max -smp 2 -m 2048 -accel tcg,thread=multi \
+            -kernel run/vmlinuz -initrd run/initramfs -append "$CMDLINE" \
+            -drive file=run/disk.qcow2,if=none,id=hd0,format=qcow2 -device virtio-blk-pci,drive=hd0 \
+            -netdev user,id=net0,hostfwd=tcp:127.0.0.1:23750-:2375 -device virtio-net-pci,netdev=net0,romfile= \
+            -display none -vga none -serial file:console.log -monitor none -parallel none &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:23750/_ping && break; sleep 5; done
+          curl -sf http://127.0.0.1:23750/version
+          docker -H tcp://127.0.0.1:23750 run --rm alpine:latest echo "container OK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vm-${{ matrix.arch }}
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Read VM version
+        run: echo "VM_VERSION=$(tr -d '[:space:]' < vm/VERSION)" >> "$GITHUB_ENV"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vm-${{ env.VM_VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: KRS Dockers VM image ${{ env.VM_VERSION }}
+          make_latest: false
+          body: |
+            Alpine Linux + Docker Engine virtual machine images used by the KRS Dockers app to run
+            Docker on phones **without root** (QEMU). The app downloads the file for your phone's
+            architecture automatically; you don't need to install these by hand.
+
+            - `krs-vm-aarch64.tar`: ARM64 phones
+            - `krs-vm-x86_64.tar`: x86_64 devices and emulators
+          files: |
+            dist/*.tar
+            dist/*.sha256
